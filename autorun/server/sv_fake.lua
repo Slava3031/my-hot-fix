@@ -77,7 +77,7 @@ hook.Add("JMod_Armor_Equip", "HandleJModArmorEquip", function(ply, slot, item, d
     local ragdoll = ply:GetNWEntity("DeathRagdoll")
     if not IsValid(ragdoll) then return end
 
-    local ent = CreateArmor(ragdoll, item)
+    local ent = teArmoCrear(ragdoll, item)
     ent.armorID = slot.id
     ent.Owner = ply
     ragdoll.armors = ragdoll.armors or {}
@@ -237,6 +237,8 @@ local function CreateArmor(ragdoll, info, owner)
 
     return ent
 end
+
+
 
 
 -- Обновленная функция переноса брони
@@ -450,6 +452,31 @@ hook.Add(
 		end
 	end
 )
+
+
+-- Исправление ситуации с бронёй при смерти в регдоле.
+hook.Add("PlayerDeath", "HandleArmorOnRagdollDeath", function(ply, inflictor, attacker)
+    local ragdoll = ply:GetNWEntity("DeathRagdoll")
+
+    if not IsValid(ragdoll) then return end
+	if ply.fake then
+        print("[DEBUG] Игрок был в фейке. Пропускаем хук PlayerDeath.")
+        return
+    end
+    -- Проверяем, есть ли броня у игрока
+    if ply.EZarmor and ply.EZarmor.items then
+        for _, armor in pairs(ply.EZarmor.items) do
+            -- Используем функцию CreateArmor для корректного создания
+            local ent = CreateArmor(ragdoll, armor, ply)
+            if not IsValid(ent) then continue end
+            -- Сварка и удаление при удалении регдолла
+            constraint.Weld(ent, ragdoll, 0, ragdoll:TranslateBoneToPhysBone(boneIndex or 0), 0, true, false)
+            ragdoll:DeleteOnRemove(ent)
+        end
+    end
+end)
+
+
 
 hook.Add(
 	"PhysgunDrop",
@@ -1011,60 +1038,6 @@ hook.Add(
 	end
 )
 
-local function CreateArmor(ragdoll,info)
-	local item = JMod.ArmorTable[info.name]
-	if not item then return end
-
-	local Index = ragdoll:LookupBone(item.bon)
-	if not Index then return end
-
-	local Pos,Ang = (ply or ragdoll):GetBonePosition(Index)
-	if not Pos then return end
-
-	local ent = ents.Create(item.ent)
-
-	local Right,Forward,Up = Ang:Right(),Ang:Forward(),Ang:Up()
-	Pos = Pos + Right * item.pos.x + Forward * item.pos.y + Up * item.pos.z
-
-	Ang:RotateAroundAxis(Right,item.ang.p)
-	Ang:RotateAroundAxis(Up,item.ang.y)
-	Ang:RotateAroundAxis(Forward,item.ang.r)
-
-	ent.IsArmor = true
-	ent:SetPos(Pos)
-	ent:SetAngles(Ang)
-
-	local color = info.col
-
-	ent:SetColor(Color(color.r,color.g,color.b,color.a))
-
-	ent:Spawn()
-	ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-	if IsValid(ent:GetPhysicsObject()) then
-		ent:GetPhysicsObject():SetMaterial("plastic")
-	end
-	constraint.Weld(ent,ragdoll,0,ragdoll:TranslateBoneToPhysBone(Index),0,true,false)
-
-	ragdoll:DeleteOnRemove(ent)
-
-	return ent
-end
-
-local function Remove(self,ply)
-	if self.override then return end
-
-	self.ragdoll.armors[self.armorID] = nil
-	JMod.RemoveArmorByID(ply,self.armorID,true)
-end
-
-local function RemoveRag(self)
-	for id,ent in pairs(self.armors) do
-		if not IsValid(ent) then continue end
-
-		ent.override = true
-		ent:Remove()
-	end
-end
 
 --изменение функции регдолла
 function PlayerMeta:CreateRagdoll(attacker, dmginfo)
