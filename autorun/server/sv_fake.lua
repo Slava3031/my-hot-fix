@@ -3,6 +3,7 @@ local PlayerMeta = FindMetaTable("Player")
 local EntityMeta = FindMetaTable("Entity")
 print("[DEBUG] sv_fake.lua loaded")
 --include("autorun/shared/sh_items.lua")
+RagdollDespawnTime = 240 -- Время деспавна по умолчанию
 
 
 Organs = {
@@ -25,17 +26,17 @@ local bonenames = {
 	["ValveBiped.Bip01_Spine4"] = "Chest",
 	["ValveBiped.Bip01_Pelvis"] = "Belly",
 	["ValveBiped.Bip01_R_Hand"] = "Right hand",
-	["ValveBiped.Bip01_R_Forearm"] = "Head",
+	["ValveBiped.Bip01_R_Forearm"] = "Right forearm artery", -- добавили
 	["ValveBiped.Bip01_R_Foot"] = "Right leg",
 	["ValveBiped.Bip01_R_Thigh"] = "Right thigh",
-	["ValveBiped.Bip01_R_Calf"] = "Right calf",
+	["ValveBiped.Bip01_R_Calf"] = "Right calf artery", -- добавили
 	["ValveBiped.Bip01_R_Shoulder"] = "Right shoulder",
 	["ValveBiped.Bip01_R_Elbow"] = "Right elbow",
 	["ValveBiped.Bip01_L_Hand"] = "Left hand",
-	["ValveBiped.Bip01_L_Forearm"] = "Head",
+	["ValveBiped.Bip01_L_Forearm"] = "Left forearm artery", -- добавили
 	["ValveBiped.Bip01_L_Foot"] = "Left leg",
 	["ValveBiped.Bip01_L_Thigh"] = "Left thigh",
-	["ValveBiped.Bip01_L_Calf"] = "Left calf",
+	["ValveBiped.Bip01_L_Calf"] = "Left calf artery",-- добавили
 	["ValveBiped.Bip01_L_Shoulder"] = "Left shoulder",
 	["ValveBiped.Bip01_L_Elbow"] = "Left elbow"
 }
@@ -554,13 +555,22 @@ concommand.Add(
 				ply:ChatPrint("Урон должен быть числом")
 				return
 			end
-			if target.Organs and target.Organs[organ] then
-				target.Organs[organ] = math.Clamp(target.Organs[organ] - damage, 0, 100)
-				if IsValid(RagdollOwner(target)) then
-					RagdollOwner(target):ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
-				elseif target:IsPlayer() then
-					target:ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
-				end
+            if target.Organs and target.Organs[organ] then
+                target.Organs[organ] = math.Clamp(target.Organs[organ] - damage, 0, 100)
+                 if organ == "artery" then
+                     target.arterybleeding = 500
+                      if IsValid(RagdollOwner(target)) then
+                            RagdollOwner(target):ChatPrint("Your artery was hit! bleeding started")
+                        elseif target:IsPlayer() then
+                            target:ChatPrint("Your artery was hit! bleeding started")
+                        end
+					else
+                      if IsValid(RagdollOwner(target)) then
+						    RagdollOwner(target):ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
+						elseif target:IsPlayer() then
+                            target:ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
+                        end
+                    end
 				print(ply:Nick().." нанес урон " .. damage .. " по органу " ..organ .. " игроку " .. target:Nick())
 			else
 				ply:ChatPrint("Неизвестный орган: " .. organ)
@@ -572,6 +582,22 @@ concommand.Add(
 )
 
 --ply:GetNWEntity("DeathRagdoll").index=table.MemberValuesFromKey(BleedingEntities,ply:GetNWEntity("DeathRagdoll"))
+
+util.AddNetworkString("SetRagdollDespawnTime")
+
+net.Receive("SetRagdollDespawnTime", function(len, ply)
+    if not ply:IsAdmin() then return end -- Только для админов
+    local newTime = net.ReadInt(16)
+
+    if newTime >= 30 and newTime <= 600 then -- Проверяем диапазон
+        RagdollDespawnTime = newTime
+        print("[DEBUG] Время деспавна регдоллов обновлено: " .. newTime .. " секунд.")
+    else
+        print("[ERROR] Неверное значение для времени деспавна.")
+    end
+end)
+
+
 hook.Add(
 	"Think",
 	"BodyDespawn",
@@ -591,7 +617,7 @@ hook.Add(
 				if not timer.Exists("DecayTimer" .. ent:EntIndex()) then
 					timer.Create(
 						"DecayTimer" .. ent:EntIndex(),
-						240,
+						RagdollDespawnTime, -- Используем переменную
 						1,
 						function()
 							if IsValid(ent) then
@@ -605,6 +631,7 @@ hook.Add(
 		end
 	end
 )
+
 
 util.AddNetworkString("ragplayercolor")
 function EntityMeta:BetterSetPlayerColor(col)
@@ -899,24 +926,71 @@ hook.Add(
 
 				--heart
 				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) and dmginfo:IsDamageType(DMG_BULLET + DMG_SLASH + DMG_BLAST + DMG_ENERGYBEAM + DMG_NEVERGIB + DMG_ALWAYSGIB + DMG_PLASMA + DMG_AIRBOAT + DMG_SNIPER + DMG_BUCKSHOT) then
+					local ply = RagdollOwner(ent) or ent
 					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
 					local ang = matrix:GetAngles()
 					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Head1"))
 					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-3, -2, -2), Vector(0, -1, -1))
 					local huy2 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-3, -2, 1), Vector(0, -1, 2))
-					if huy or huy2 then
+					-- новые артерии
+					local matrix_l_arm = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Forearm"))
+					local ang_l_arm = matrix_l_arm:GetAngles()
+					local pos_l_arm = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_L_Forearm"))
+					local huy3 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos_l_arm, ang_l_arm, Vector(-2, -2, -2), Vector(2, 2, 2))
+		
+					local matrix_r_arm = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Forearm"))
+					local ang_r_arm = matrix_r_arm:GetAngles()
+					local pos_r_arm = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_R_Forearm"))
+					local huy4 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos_r_arm, ang_r_arm, Vector(-2, -2, -2), Vector(2, 2, 2))
+		
+					local matrix_l_leg = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Calf"))
+					local ang_l_leg = matrix_l_leg:GetAngles()
+					local pos_l_leg = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_L_Calf"))
+					local huy5 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos_l_leg, ang_l_leg, Vector(-2, -2, -2), Vector(2, 2, 2))
+		
+					local matrix_r_leg = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Calf"))
+					local ang_r_leg = matrix_r_leg:GetAngles()
+					local pos_r_leg = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_R_Calf"))
+					local huy6 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos_r_leg, ang_r_leg, Vector(-2, -2, -2), Vector(2, 2, 2))
+					if huy or huy2 or huy3 or huy4 or huy5 or huy6 then
 						if ply.Organs["artery"] ~= 0 then
 							ply.Organs["artery"] = math.Clamp(ply.Organs["artery"] - dmginfo:GetDamage(), 0, 1)
-							if ply.Organs["artery"] == 0 then
-								if not ply.fake then
-									Faking(ply)
-								end
-							end
+								if ply.Organs["artery"] == 0 then
+									if not ply.fake then
+										Faking(ply)
+									end
+								 end
+							 if huy3 then
+								   if IsValid(RagdollOwner(ent)) then
+									  RagdollOwner(ent):ChatPrint("Your left forearm artery was hit!")
+								   elseif ent:IsPlayer() then
+										ent:ChatPrint("Your left forearm artery was hit!")
+									end
+							  end
+							  if huy4 then
+									if IsValid(RagdollOwner(ent)) then
+									   RagdollOwner(ent):ChatPrint("Your right forearm artery was hit!")
+								   elseif ent:IsPlayer() then
+										ent:ChatPrint("Your right forearm artery was hit!")
+									end
+							  end
+							  if huy5 then
+								   if IsValid(RagdollOwner(ent)) then
+									  RagdollOwner(ent):ChatPrint("Your left calf artery was hit!")
+								   elseif ent:IsPlayer() then
+										ent:ChatPrint("Your left calf artery was hit!")
+									end
+							  end
+							  if huy6 then
+									if IsValid(RagdollOwner(ent)) then
+									   RagdollOwner(ent):ChatPrint("Your right calf artery was hit!")
+								   elseif ent:IsPlayer() then
+										ent:ChatPrint("Your right calf artery was hit!")
+									end
+							  end
 						end
 					end
 				end
-
-				--coronary artery
 				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
 					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine4"))
 					local ang = matrix:GetAngles()
