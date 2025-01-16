@@ -14,7 +14,7 @@ function stamina()
 			if IsValid(ply) and ply:Alive() then
 				-- Проверяем WaterLevel
 				if IsValid(ply) and ply:WaterLevel() > 1 then
-					-- Ваш код
+					
 				end
 			end
 		end
