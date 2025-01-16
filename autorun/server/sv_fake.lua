@@ -26,17 +26,17 @@ local bonenames = {
 	["ValveBiped.Bip01_Spine4"] = "Chest",
 	["ValveBiped.Bip01_Pelvis"] = "Belly",
 	["ValveBiped.Bip01_R_Hand"] = "Right hand",
-	["ValveBiped.Bip01_R_Forearm"] = "Head",
+	["ValveBiped.Bip01_R_Forearm"] = "Right forearm artery", -- добавили
 	["ValveBiped.Bip01_R_Foot"] = "Right leg",
 	["ValveBiped.Bip01_R_Thigh"] = "Right thigh",
-	["ValveBiped.Bip01_R_Calf"] = "Right calf",
+	["ValveBiped.Bip01_R_Calf"] = "Right calf artery", -- добавили
 	["ValveBiped.Bip01_R_Shoulder"] = "Right shoulder",
 	["ValveBiped.Bip01_R_Elbow"] = "Right elbow",
 	["ValveBiped.Bip01_L_Hand"] = "Left hand",
-	["ValveBiped.Bip01_L_Forearm"] = "Head",
+	["ValveBiped.Bip01_L_Forearm"] = "Left forearm artery", -- добавили
 	["ValveBiped.Bip01_L_Foot"] = "Left leg",
 	["ValveBiped.Bip01_L_Thigh"] = "Left thigh",
-	["ValveBiped.Bip01_L_Calf"] = "Left calf",
+	["ValveBiped.Bip01_L_Calf"] = "Left calf artery",-- добавили
 	["ValveBiped.Bip01_L_Shoulder"] = "Left shoulder",
 	["ValveBiped.Bip01_L_Elbow"] = "Left elbow"
 }
@@ -555,13 +555,22 @@ concommand.Add(
 				ply:ChatPrint("Урон должен быть числом")
 				return
 			end
-			if target.Organs and target.Organs[organ] then
-				target.Organs[organ] = math.Clamp(target.Organs[organ] - damage, 0, 100)
-				if IsValid(RagdollOwner(target)) then
-					RagdollOwner(target):ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
-				elseif target:IsPlayer() then
-					target:ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
-				end
+            if target.Organs and target.Organs[organ] then
+                target.Organs[organ] = math.Clamp(target.Organs[organ] - damage, 0, 100)
+                 if organ == "artery" then
+                     target.arterybleeding = 500
+                      if IsValid(RagdollOwner(target)) then
+                            RagdollOwner(target):ChatPrint("Your artery was hit! bleeding started")
+                        elseif target:IsPlayer() then
+                            target:ChatPrint("Your artery was hit! bleeding started")
+                        end
+					else
+                      if IsValid(RagdollOwner(target)) then
+						    RagdollOwner(target):ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
+						elseif target:IsPlayer() then
+                            target:ChatPrint("Урон органу "..organ.." нанесён : " .. damage .. " points.")
+                        end
+                    end
 				print(ply:Nick().." нанес урон " .. damage .. " по органу " ..organ .. " игроку " .. target:Nick())
 			else
 				ply:ChatPrint("Неизвестный орган: " .. organ)
@@ -673,318 +682,328 @@ hook.Add(
 )
 
 --урон по разным костям регдолла
-hook.Add(
-	"EntityTakeDamage",
-	"ragdamage",
-	function(ent, dmginfo)
-		if ent.deadbody and not ent.IsBleeding and dmginfo:IsDamageType(DMG_BULLET + DMG_SLASH + DMG_BLAST + DMG_ENERGYBEAM + DMG_NEVERGIB + DMG_ALWAYSGIB + DMG_PLASMA + DMG_AIRBOAT + DMG_SNIPER + DMG_BUCKSHOT) then
-			ent.IsBleeding = true
+--hook.Add("EntityTakeDamage", "Neck", function(target, dmginfo)
+	local r_tooth = math.random(4,9)
+
+	local bullet_force = dmginfo:GetDamageForce()
+	local bullet_pos = dmginfo:GetDamagePosition()
+	if target:IsPlayer() and dmginfo:IsBulletDamage() and dmginfo:GetAttacker():GetActiveWeapon():GetClass() != "wep_mann_hmcd_pnevmat" then
+	local pos,ang = target:GetBonePosition(target:LookupBone('ValveBiped.Bip01_Head1'))
+        local neckhit1 = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-3,-2,-2),Vector(0,-1,-1))
+        local neckhit2 = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-3,-2,1),Vector(0,-1,2))
+
+		local neckart = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-2,-2,-0.8), Vector(-1,-1,0.8))
+        if neckart then
+			target.pulse3 = target.pulse3 + 3
+			print("Neck artery Hitted")
+			target:SetNWBool("ArterialBleeding", 1)
+			timer.Create("Neck_Artery" .. target:SteamID(), 0.1, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Neck1"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        	target:SetWalkSpeed(50)
+        	target:SetRunSpeed(100)
+        	if bloodTrace.Hit then
+				if default_dblood == false then
+            	util.Decal(table.Random(artery_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+				if default_dblood == true then
+            	util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end        
+				target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target.pulse3 / 5)
+            	target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 1)
+            	target:EmitSound(table.Random(bleedsounds), 75, 100, 1, CHAN_AUTO)
+        	end
+    		end)
 		end
-
-		local trace = util.QuickTrace(dmginfo:GetDamagePosition(), dmginfo:GetDamageForce():GetNormalized() * 100)
-		local bone = trace.PhysicsBone
-		local hitgroup
-		local isfall
-		local bonename = ent:GetBoneName(bone)
-		if bonetohitgroup[bonename] ~= nil then
-			hitgroup = bonetohitgroup[bonename]
-		end
-
-		if RagdollDamageBoneMul[hitgroup] then
-			if RagdollOwner(ent) then
-				dmginfo:ScaleDamage(0.3)
-				timer.Create("faketimer" .. RagdollOwner(ent):EntIndex(), dmginfo:GetDamage() / 30, 1, function() end)
-				if hitgroup == HITGROUP_HEAD then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					dmginfo:ScaleDamage(2)
-					if dmginfo:GetDamageType() == 2 then
-						dmginfo:ScaleDamage(2)
-					end
-
-					if dmginfo:GetDamageType() == 1 and dmginfo:GetDamage() > 6 and ent:GetVelocity():Length() > 500 then
-						RagdollOwner(ent):ChatPrint("Your neck was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 511, 200, 1, CHAN_ITEM)
-						dmginfo:ScaleDamage(1000000)
-					end
-
-					if dmginfo:GetDamageType() == 1 and dmginfo:GetDamage() > 5 and ent:GetVelocity():Length() > 220 and RagdollOwner(ent).Otrub == 0 then
-						RagdollOwner(ent).pain = 270
-					end
+		if neckhit1 or neckhit2 then
+			print("Neck venous Hitted")
+			target.pulse3 = target.pulse3 + 3
+			target:SetNWBool("VenousBleeding", 1)
+			timer.Create("Neck_Venous" .. target:SteamID(), 0.2, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Neck1"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        	target:SetWalkSpeed(50)
+        	target:SetRunSpeed(100)
+        	if bloodTrace.Hit then
+				if default_dblood == false then
+            	util.Decal(table.Random(artery_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
 				end
-
-				if hitgroup == HITGROUP_LEFTARM then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					dmginfo:ScaleDamage(0.3)
-					if dmginfo:GetDamageType() == 2 and dmginfo:GetDamage() > 10 and RagdollOwner(ent).LeftArm > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your left arm was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).LeftArm = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-
-					if dmginfo:GetDamageType() == 1 and ent:GetVelocity():Length() > 600 and RagdollOwner(ent).LeftArm > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your left arm was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).LeftArm = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
+				if default_dblood == true then
+            	util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
 				end
-
-				if hitgroup == HITGROUP_LEFTLEG then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					dmginfo:ScaleDamage(0.3)
-					if dmginfo:GetDamageType() == 2 then end
-					if dmginfo:GetDamageType() == 2 and dmginfo:GetDamage() > 15 and RagdollOwner(ent).LeftLeg > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your left leg was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).LeftLeg = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-
-					if dmginfo:GetDamageType() == 1 and ent:GetVelocity():Length() > 600 and RagdollOwner(ent).LeftLeg > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your left leg was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).LeftLeg = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-				end
-
-				if hitgroup == HITGROUP_RIGHTLEG then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					dmginfo:ScaleDamage(0.3)
-					if dmginfo:GetDamageType() == 2 and dmginfo:GetDamage() > 15 and RagdollOwner(ent).RightLeg > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your right leg was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).RightLeg = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-
-					if dmginfo:GetDamageType() == 1 and ent:GetVelocity():Length() > 600 and RagdollOwner(ent).RightLeg > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your right leg was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).RightLeg = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-				end
-
-				if hitgroup == HITGROUP_RIGHTARM then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					dmginfo:ScaleDamage(0.3)
-					if dmginfo:GetDamageType() == 2 and dmginfo:GetDamage() > 10 and RagdollOwner(ent).RightArm > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your right hand was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).RightArm = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-
-					if dmginfo:GetDamageType() == 1 and ent:GetVelocity():Length() > 600 and RagdollOwner(ent).RightArm > 0.6 then
-						RagdollOwner(ent):ChatPrint("Your right hand was broken")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-						RagdollOwner(ent).RightArm = 0.6
-						dmginfo:ScaleDamage(0.3)
-					end
-				end
-
-				if hitgroup == HITGROUP_CHEST then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					if dmginfo:GetDamageType() == 1 and ent:GetVelocity():Length() > 800 and RagdollOwner(ent).Organs["spine"] > 0 then
-						RagdollOwner(ent).brokenspine = true
-						RagdollOwner(ent).Organs["spine"] = 0
-						RagdollOwner(ent):ChatPrint("Your spine was broken.")
-						ent:EmitSound("NPC_Barnacle.BreakNeck", 511, 200, 1, CHAN_ITEM)
-						dmginfo:ScaleDamage(0.3)
-					end
-
-					dmginfo:ScaleDamage(0.8)
-				end
-
-				if hitgroup == HITGROUP_STOMACH then
-					if dmginfo:GetAttacker():IsRagdoll() then return end
-					dmginfo:ScaleDamage(0.5)
-				end
-			end
-
-			local ply
-			local penetration
-			if IsValid(RagdollOwner(ent)) then
-				ply = RagdollOwner(ent)
-			elseif ent:IsPlayer() then
-				ply = ent
-			end
-
-			if dmginfo:IsDamageType(DMG_BULLET + DMG_SLASH) then
-				penetration = dmginfo:GetDamageForce() * 0.008
-			else
-				penetration = dmginfo:GetDamageForce() * 0.004
-			end
-
-			if not dmginfo:IsDamageType(DMG_CRUSH + DMG_GENERIC) then
-				if hitgroup == 1 and ent:IsPlayer() and ent.fake == false and ent:Alive() then
-					Faking(ent)
-				end
-
-                if ent:LookupBone(bonename)==3 then
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine2"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine2"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-1, 0, -6), Vector(10, 6, 6))
-					ply:ChatPrint("You were hit in the lungs.")
-					if huy ~= nil then
-						if ply.Organs["lungs"] ~= 0 then
-							ply.Organs["lungs"] = math.Clamp(ply.Organs["lungs"] - dmginfo:GetDamage(), 0, 30)
-							if ply.Organs["lungs"]==0 then ply:ChatPrint("Твои легкие были уничтожены.") end
-						end
-					end
-				end
-                end
-				
-				if ent:LookupBone(bonename)==6 then
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Head1"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(2, -4, -3), Vector(7, 4, 3))
-					if huy then
-					if IsValid(RagdollOwner(ent)) then
-						RagdollOwner(ent):Kill()
-					elseif ent:IsPlayer() then
-						ent:Kill()
-					end
-					end
-					ply:ChatPrint("You were hit in the brain.")
-					if huy then
-						if ply.Organs["brain"] ~= 0 then
-							ply.Organs["brain"] = math.Clamp(ply.Organs["brain"] - dmginfo:GetDamage(), 0, 20)
-							if ply.Organs["brain"] == 0 then
-								ply:ChatPrint("Your brains are out.")
-							end
-						end
-					end
-				end
-                end
-				--brain
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine1"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine1"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-4, -1, -6), Vector(2, 5, -1))
-					if huy then
-						if ply.Organs["liver"] ~= 0 then
-							ply.Organs["liver"] = math.Clamp(ply.Organs["liver"] - dmginfo:GetDamage(), 0, 30)
-						end
-					end
-				end
-
-				--liver
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine1"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine1"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-4, -1, -1), Vector(2, 5, 6))
-					if huy then
-						if ply.Organs["stomach"] ~= 0 then
-							ply.Organs["stomach"] = math.Clamp(ply.Organs["stomach"] - dmginfo:GetDamage(), 0, 40)
-						end
-					end
-				end
-
-				--stomach
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-4, -1, -6), Vector(1, 5, 6))
-					if huy then
-						if ply.Organs["intestines"] ~= 0 then
-							ply.Organs["intestines"] = math.Clamp(ply.Organs["intestines"] - dmginfo:GetDamage(), 0, 40)
-						end
-					end
-				end
-
-				
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine2"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine2"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(1, 0, -1), Vector(5, 4, 3))
-					if huy then
-						if ply.Organs["heart"] ~= 0 then
-							ply.Organs["heart"] = math.Clamp(ply.Organs["heart"] - dmginfo:GetDamage(), 0, 10)
-						end
-					end
-				end
-
-				--heart
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) and dmginfo:IsDamageType(DMG_BULLET + DMG_SLASH + DMG_BLAST + DMG_ENERGYBEAM + DMG_NEVERGIB + DMG_ALWAYSGIB + DMG_PLASMA + DMG_AIRBOAT + DMG_SNIPER + DMG_BUCKSHOT) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Head1"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-3, -2, -2), Vector(0, -1, -1))
-					local huy2 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-3, -2, 1), Vector(0, -1, 2))
-					if huy or huy2 then
-						if ply.Organs["artery"] ~= 0 then
-							ply.Organs["artery"] = math.Clamp(ply.Organs["artery"] - dmginfo:GetDamage(), 0, 1)
-							if ply.Organs["artery"] == 0 then
-								if not ply.fake then
-									Faking(ply)
-								end
-							end
-						end
-					end
-				end
-
-				--coronary artery
-				if ent:IsPlayer() or IsValid(RagdollOwner(ent)) then
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine4"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine4"))
-					local huy = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-8, -1, -1), Vector(2, 0, 1))
-					local matrix = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine1"))
-					local ang = matrix:GetAngles()
-					local pos = ent:GetBonePosition(ent:LookupBone("ValveBiped.Bip01_Spine1"))
-					local huy2 = util.IntersectRayWithOBB(dmginfo:GetDamagePosition(), penetration, pos, ang, Vector(-8, -3, -1), Vector(2, -2, 1))
-					if huy or huy2 then
-						if ply.Organs["spine"] ~= 0 then
-							ply.Organs["spine"] = math.Clamp(ply.Organs["spine"] - dmginfo:GetDamage(), 0, 1)
-							if ply.Organs["spine"] == 0 then
-								if not ply.fake then
-									Faking(ply)
-									ply.brokenspine = true
-									ply:ChatPrint("Your spine was broken.")
-								end
-							end
-						end
-					end
-				end
-				--spine
-			end
-
-			--print(dmginfo:GetDamage())
-			--print(hitgroup)
-			if IsValid(RagdollOwner(ent)) then
-				RagdollOwner(ent).LastHit = bonename
-			elseif ent:IsPlayer() then
-				ent.LastHit = bonename
-			end
-		end
-
-		if IsValid(RagdollOwner(ent)) then
-			if dmginfo:GetDamageType() == 1 then
-				if dmginfo:GetAttacker():IsRagdoll() then
-					RagdollOwner(ent):SetHealth(RagdollOwner(ent):Health())
-				else
-					RagdollOwner(ent):SetHealth(RagdollOwner(ent):Health() - dmginfo:GetDamage() / 100)
-				end
-			end
-
-			RagdollOwner(ent):TakeDamageInfo(dmginfo)
-			if RagdollOwner(ent):Health() <= 0 and RagdollOwner(ent):Alive() then
-				RagdollOwner(ent):Kill()
-			end
+            	target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target.pulse3 / 6)
+            	target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 1)
+            	target:EmitSound(table.Random(bleedsounds), 75, 100, 1, CHAN_AUTO)
+        	end
+    		end)
 		end
 	end
-)
+end)
+
+hook.Add("EntityTakeDamage", "Head_Trahea", function(target, dmginfo)
+	local r_tooth = math.random(4,9)
+
+	local bullet_force = dmginfo:GetDamageForce()
+	local bullet_pos = dmginfo:GetDamagePosition()
+	if target:IsPlayer() and dmginfo:IsBulletDamage() and dmginfo:GetAttacker():GetActiveWeapon():GetClass() != "wep_mann_hmcd_pnevmat" then
+    	local pos,ang = target:GetBonePosition(target:LookupBone('ValveBiped.Bip01_Head1'))
+        local head = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(2,-5,-3),Vector(7,3,3))
+        local mouth = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-1,-5,-3),Vector(2,1,3))
+        local trahea = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-9,-1,-0.8), Vector(-2,0.2,0.8))
+        if head then
+			print("Head Hitted")
+			target:Kill()
+			target:ChatPrint("Пуля угодила прям в черепушку и проникла в головной мозг! Вы мертвы!")
+		end
+
+		if mouth then
+			print("Mouth Hitted")
+			target.pulse3 = target.pulse3 + 5
+			target:ChatPrint("Пуля попала вам в область рта, ваша челюсть свисает, вы лишились нескольких зубов.")
+			target:SetNWInt("Tooth", target:GetNWInt("Tooth", 32) - r_tooth)
+            target:SetNWBool("ArterialBleeding", true)
+			timer.Create("Mouth_Head" .. target:SteamID(), 0.3, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Neck1"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        	target:SetWalkSpeed(50)
+        	target:SetRunSpeed(100)
+        	if bloodTrace.Hit then
+				if default_dblood == false then
+            	util.Decal(table.Random(artery_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+				if default_dblood == true then
+            	util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+            	target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target.pulse3 / 5)
+            	target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 1)
+            	target:EmitSound(table.Random(bleedsounds), 75, 100, 1, CHAN_AUTO)
+        	end
+    		end)
+		end
+
+		if trahea then
+			print("Trahea hit")
+			target.pulse3 = target.pulse3 + 7
+			target:SetNWInt("Pain", target:GetNWInt("Pain",0) + 30)
+			target:ChatPrint("Пуля попала вам в трахею, дыхание затруднено.")
+    		timer.Create("Trahea" .. target:SteamID(), 3, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Head1"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        		if bloodTrace.Hit then
+					if default_dblood == false then
+            			util.Decal(table.Random(venous_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+					end
+					if default_dblood == true then
+            			util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+					end
+            		target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target:GetNWInt("O2", 100) / 3)
+					target:SetNWInt("O2", target:GetNWInt("O2", 100) - 15)
+        		end
+			end)
+		end
+	end
+end)
+
+hook.Add("EntityTakeDamage", "Heart_Lung_Aorta_Bones", function(target, dmginfo)
+	local bullet_force = dmginfo:GetDamageForce()
+	local bullet_pos = dmginfo:GetDamagePosition()
+	
+	if target:IsPlayer() and dmginfo:IsBulletDamage() and dmginfo:GetAttacker():GetActiveWeapon():GetClass() != "wep_mann_hmcd_pnevmat" then
+    	local pos,ang = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Spine1"))
+        local aorta = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-4,1,1), Vector(4,2,2))
+
+		local pos,ang = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Spine2"))
+        local lung = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(1,-1,-6), Vector(8,7,6))
+        local heart = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(1,0,-1), Vector(5,4,3))
+
+        if aorta then
+            print("Aorta Hitted")
+			target.pulse3 = target.pulse3 + 4
+            target:ChatPrint("В вас попали! У вас разорвалась аорта!")
+            target:EmitSound("player/pl_pain5.wav", 75, 100, 1, CHAN_AUTO)
+            target:EmitSound("player/breathe1.wav", 75, 100, 1, CHAN_AUTO)
+            target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 20)
+            target:SetNWBool("ArterialBleeding", true)
+			target.aorta = true
+			timer.Create("Aorta" .. target:SteamID(), 0.3, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Spine2"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        	target:SetWalkSpeed(50)
+        	target:SetRunSpeed(100)
+        	if bloodTrace.Hit then
+				if default_dblood == false then
+            	util.Decal(table.Random(artery_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+				if default_dblood == true then
+            	util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+            	target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target.pulse3 / 3)
+            	target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 2)
+            	target:EmitSound(table.Random(bleedsounds), 75, 100, 1, CHAN_AUTO)
+        	end
+    		end)
+        end
+
+        if heart then
+            print("Heart Hitted")
+			target.pulse3 = target.pulse3 + 3
+			target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 30)
+			target:ChatPrint("Бум, вам попали в сердце, у вас сильная отдышка и очень массивная боль.")
+            target:SetNWBool("ArterialBleeding", true)
+			timer.Create("HeartArtery" .. target:SteamID(), 0.3, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Spine2"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        	target:SetWalkSpeed(50)
+        	target:SetRunSpeed(100)
+        	if bloodTrace.Hit then
+				if default_dblood == false then
+            	util.Decal(table.Random(artery_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+				if default_dblood == true then
+            	util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+            	target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target.pulse3 / 3)
+            	target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 2)
+            	target:EmitSound(table.Random(bleedsounds), 75, 100, 1, CHAN_AUTO)
+        	end
+    		end)
+			timer.Create("pulse3Hurt" .. target:SteamID(), 4, 5, function()
+            	target.pulse3 = target.pulse3 - 9
+    		end)
+		end
+        if lung then
+			print("Lung Hitted")
+				target.pulse3 = target.pulse3 + 3
+				target:ChatPrint("Вы чувствуете, что ваша грудная клетка переполняется кислородом, видимо у вас пневмоторакс! Вы кашляете кровью!")
+    		timer.Create("Torax" .. target:SteamID(), 3, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Head1"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        		if bloodTrace.Hit then
+					if default_dblood == false then
+            			util.Decal(table.Random(venous_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+					end
+					if default_dblood == true then
+            			util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+					end
+            		target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target:GetNWInt("O2", 100) / 5)
+						target:SetNWInt("O2", target:GetNWInt("O2", 100) - 15)
+        		end
+			end)
+		end
+	end
+end)
+
+hook.Add("EntityTakeDamage", "Liver", function(target, dmginfo)
+	local bullet_force = dmginfo:GetDamageForce()
+
+	local bullet_pos = dmginfo:GetDamagePosition()
+	if target:IsPlayer() and dmginfo:IsBulletDamage() and dmginfo:GetAttacker():GetActiveWeapon():GetClass() != "wep_mann_hmcd_pnevmat" then
+    	local pos,ang = target:GetBonePosition(target:LookupBone('ValveBiped.Bip01_Spine'))
+        local liver = util.IntersectRayWithOBB(bullet_pos,bullet_force, pos, ang, Vector(-1,-2,-5),Vector(4,4,1))
+        if liver then
+            print("Liver Hitted")
+			target.pulse3 = target.pulse3 + 3
+            target:ChatPrint("Ваша печень повреждена!")
+            target:EmitSound("player/pl_pain5.wav", 75, 100, 1, CHAN_AUTO)
+            target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 10)
+            target:SetNWBool("LiverBleeding", true)
+			timer.Create("Liver" .. target:SteamID(), 0.6, 0, function()
+            	local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Spine"))
+            	local bloodPos = handPos + handAng:Forward() * 50
+            	local bloodTrace = util.TraceLine({
+                	start = bloodPos,
+                	endpos = bloodPos - Vector(0, 0, 100),
+                	filter = target
+            	})
+        	target:SetWalkSpeed(50)
+        	target:SetRunSpeed(100)
+        	if bloodTrace.Hit then
+				if default_dblood == false then
+            	util.Decal("Cross", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+				if default_dblood == true then
+            	util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
+				end
+            	target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target.pulse3 / 5)
+            	target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 2)
+            	target:EmitSound(table.Random(bleedsounds), 75, 100, 1, CHAN_AUTO)
+        	end
+    		end)
+        return end
+	end
+end)
+в этом коде в конце добавь новый хит бокс для pelvis
+и учти что я использую
+
+local Organs = {
+	["brain"] = 20,
+	["lungs"] = 30,
+	["liver"] = 30,
+	["stomach"] = 40,
+	["intestines"] = 40,
+	["heart"] = 10,
+	["artery"] = 1,
+	["spine"] = 10,
+	["pelvis"] = 1
+}
+
+local bonenames = {
+	["ValveBiped.Bip01_Head1"] = "Head",
+	["ValveBiped.Bip01_Spine"] = "Belly",
+	["ValveBiped.Bip01_Spine1"] = "intestines",
+	["ValveBiped.Bip01_Spine2"] = "Chest",
+	["ValveBiped.Bip01_Spine4"] = "Chest",
+	["ValveBiped.Bip01_Pelvis"] = "Pelvis",
+	["ValveBiped.Bip01_R_Hand"] = "Right hand",
+	["ValveBiped.Bip01_R_Forearm"] = "Right forearm artery",
+	["ValveBiped.Bip01_R_Foot"] = "Right leg",
+	["ValveBiped.Bip01_R_Thigh"] = "Right thigh",
+	["ValveBiped.Bip01_R_Calf"] = "Right calf artery",
+	["ValveBiped.Bip01_R_Shoulder"] = "Right shoulder",
+	["ValveBiped.Bip01_R_Elbow"] = "Right elbow",
+	["ValveBiped.Bip01_L_Hand"] = "Left hand",
+	["ValveBiped.Bip01_L_Forearm"] = "Left forearm artery",
+	["ValveBiped.Bip01_L_Foot"] = "Left leg",
+	["ValveBiped.Bip01_L_Thigh"] = "Left thigh",
+	["ValveBiped.Bip01_L_Calf"] = "Left calf artery",
+	["ValveBiped.Bip01_L_Shoulder"] = "Left shoulder",
+	["ValveBiped.Bip01_L_Elbow"] = "Left elbow"
+}
 
 concommand.Add(
 	"fake",
