@@ -96,23 +96,6 @@ hook.Add(
 				dmginfo:ScaleDamage(0.3)
 			end
 		end
-		--Новая кость, которая ломается как и нога или рука
-        if hitgroup == HITGROUP_STOMACH then
-            dmginfo:ScaleDamage(1)
-			ply:SetNWAngle("viewpunch", Angle(10, math.Rand(-15, 15), math.Rand(-15, 15)) / 2)
-            if dmginfo:GetDamage() > 30 and ply.Pelvis > 0.6 then -- Урон для перелома
-                ply:ChatPrint("Your pelvis was broken!")
-                ply:EmitSound("NPC_Barnacle.BreakNeck", 100, 200, 1, CHAN_ITEM)
-                ply.Pelvis = 0.6
-                dmginfo:ScaleDamage(0.3)
-            end
-		
-			if not ply.fake then
-				if dmginfo:GetDamageForce():Length() > 6000 or ply.pain > 120 then
-					Faking(ply)
-				end
-			end
-		end
 
 		if hitgroup == HITGROUP_CHEST then
 			dmginfo:ScaleDamage(1)
@@ -123,6 +106,7 @@ hook.Add(
 				end
 			end
 		end
+
 		if hitgroup == HITGROUP_STOMACH then
 			ply:SetNWAngle("viewpunch", Angle(10, math.Rand(-15, 15), math.Rand(-15, 15)) / 2)
 			dmginfo:ScaleDamage(1)
