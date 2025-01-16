@@ -41,9 +41,9 @@ function stamina()
 							ply.stamina = 100
 							ply:SetNWInt("stamina", ply.stamina)
 						end
-
+						
 						if not ply.fake then
-							if ply.stamina < 60 and ply:WaterLevel() <= 2 or ply.Organs["lungs"] == 0 and ply:WaterLevel() <= 2 then
+							if ply.stamina < 60 and ply:WaterLevel() <= 2 or (ply.Organs and ply.Organs["lungs"] == 0) and ply:WaterLevel() <= 2 then
 								ply:EmitSound("snds_jack_hmcd_breathing/m" .. math.random(1, 6) .. ".wav", 60, 100, 0.6, CHAN_AUTO)
 							end
 
@@ -80,7 +80,7 @@ function stamina()
 								end
 							end
 
-							if ply.stamina < 60 and ply.fakeragdoll:WaterLevel() <= 2 or ply.Organs["lungs"] == 0 and ply.fakeragdoll:WaterLevel() <= 2 and ply:Alive() then
+							if ply.stamina < 60 and ply.fakeragdoll:WaterLevel() <= 2 or (ply.Organs and ply.Organs["lungs"] == 0) and ply.fakeragdoll:WaterLevel() <= 2 and ply:Alive() then
 								ply:EmitSound("snds_jack_hmcd_breathing/m" .. math.random(1, 6) .. ".wav", 60, 100, 0.6, CHAN_AUTO)
 							end
 
