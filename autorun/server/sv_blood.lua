@@ -19,13 +19,10 @@ function Bleeding()
 		function(victim, dmginfo)
 			victim.Blood = victim.Blood or 5000
 			victim.Bloodlosing = victim.Bloodlosing or 0
-			--[[if dmginfo:IsDamageType(DMG_BLAST) then
-        	Faking(victim)
-    	end]]
 			if dmginfo:IsDamageType(DMG_BULLET + DMG_SLASH + DMG_BLAST + DMG_ENERGYBEAM + DMG_NEVERGIB + DMG_ALWAYSGIB + DMG_PLASMA + DMG_AIRBOAT + DMG_SNIPER + DMG_BUCKSHOT) then
 				if victim:IsPlayer() or IsValid(RagdollOwner(victim)) then
 					damage = dmginfo:GetDamage()
-					victim.Bloodlosing = victim.Bloodlosing + (damage / 3)
+					victim.Bloodlosing = victim.Bloodlosing + (damage / 1) -- Увеличение кровопотери
 					victim:SetNWInt("BloodLosing", victim.Bloodlosing)
 					victim.IsBleeding = true
 				end
@@ -56,24 +53,22 @@ function Bleeding()
 				if not (ply.BLEEDING_NextThink > CurTime()) then
 					ply.BLEEDING_NextThink = CurTime() + pulse
 					if ply.HasLeft == nil then
-						ply.Bloodlosing = ply.Bloodlosing or 0
 						if ply.Bloodlosing < 0 then
 							ply.Bloodlosing = 0
 							ply:SetNWInt("BloodLosing", ply.Bloodlosing)
 						end
 
 						if ply.Bloodlosing > 0 or ply.arterybleeding then
-							--print("pain: "..ply.Bloodlosing.." - "..ply:GetName())
 							ply.Bloodlosing = ply:GetNWInt("BloodLosing")
-							ply.Bloodlosing = ply.Bloodlosing - 0.5
-							ply.Blood = ply.Blood - ply.Bloodlosing / 5 - ply.arterybloodlosing / 5
+							ply.Bloodlosing = ply.Bloodlosing - 2  -- Увеличили скорость потери крови
+							ply.Blood = ply.Blood - ply.Bloodlosing / 3 - ply.arterybloodlosing / 3
 							ply:SetNWInt("BloodLosing", ply.Bloodlosing)
 							ply:SetNWInt("Blood", ply.Blood)
 							ply:SetNWInt("Speed", ply.Speed)
 							if ply.Organs["artery"] == 0 and not ply.holdingartery then
-								ply.arterybloodlosing = 250
+								ply.arterybloodlosing = 500
 							else
-								ply.arterybloodlosing = 50
+								ply.arterybloodlosing = 200
 							end
 
 							if IsValid(ply:GetNWEntity("DeathRagdoll")) then
@@ -95,16 +90,16 @@ function Bleeding()
 							local Pos2 = trw.HitPos - trw.HitNormal
 							util.Decal("Blood", Pos1, Pos2, ply)
 						elseif ply.Blood < 5000 then
-							--print(ply.Blood.." - "..ply:GetName())
-							ply.Blood = ply:GetNWInt("Blood") + 5
+							ply.Blood = ply:GetNWInt("Blood") + 2
 							ply:SetNWInt("Blood", ply.Blood)
 							ply:SetNWInt("Speed", ply.Speed)
 							ply.IsBleeding = false
 						end
-
-						ply:SetWalkSpeed((120 * (ply.Blood / 5000)) * (ply.stamina / 100) * ply.RightLeg * ply.LeftLeg)
-						ply:SetRunSpeed((210 * (ply.Blood / 5000) + (ply.Speed * 50)) * (ply.stamina / 100) * ply.RightLeg * ply.LeftLeg)
-						ply:SetJumpPower(((190 * (ply.Blood / 5000) + (ply.Speed * 25)) * (ply.stamina / 100)) * ply.RightLeg * ply.LeftLeg)
+                        local speedMult =  math.Clamp(ply.Blood/5000, 0.35,1)
+						local speedMult2 = math.Clamp(ply.stamina/100, 0.35,1)
+						ply:SetWalkSpeed((120 * speedMult) * speedMult2 * ply.RightLeg * ply.LeftLeg)
+                        ply:SetRunSpeed((210 * speedMult+ (ply.Speed * 50)) * speedMult2 * ply.RightLeg * ply.LeftLeg)
+						ply:SetJumpPower(((190 * speedMult + (ply.Speed * 25)) * speedMult2) * ply.RightLeg * ply.LeftLeg)
 					end
 				end
 			end
@@ -231,5 +226,6 @@ function Bleeding1()
 		end
 	)
 end
+
 
 Bleeding1()
