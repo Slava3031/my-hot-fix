@@ -885,35 +885,19 @@ local function HandleOrganDamage(target, dmginfo)
                 end
 
                 if trahea then
-                    print("Trahea hit")
+					print("Trahea hit")
 					target:ChatPrint("Пуля попала вам в трахею, дыхание затруднено.")
-                    target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 30)
-                     timer.Create(timerName, 3, 0, function()
+					target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 30)
+					target.stamina = math.max(target.stamina - 20, 0) -- Уменьшение стамины из-за трудностей с дыханием
+					local timerName = "organ_timer" .. target:SteamID()
+					timer.Create(timerName, 3, 0, function()
 						if not IsValid(target) then timer.Remove(timerName); return end
-                        local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Head1"))
-                        local bloodPos = handPos + handAng:Forward() * 50
-                        local bloodTrace = util.TraceLine({
-                            start = bloodPos,
-                            endpos = bloodPos - Vector(0, 0, 100),
-                            filter = target
-                        })
-                        if bloodTrace.Hit then
-                            if default_dblood == false then
-								if not IsValid(target) then timer.Remove(timerName); return end
-                                util.Decal(table.Random(venous_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
-                            end
-                            if default_dblood == true then
-								if not IsValid(target) then timer.Remove(timerName); return end
-                                util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
-                            end
-							if not IsValid(target) then timer.Remove(timerName); return end
-                            target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target:GetNWInt("O2", 100) / 3)
-                            target:SetNWInt("O2", target:GetNWInt("O2", 100) - 15)
-                        end
-                    end)
-                     AllTimers[timerName] = timerName
-                    TraheaTimers[target:SteamID()] = timerName
-                end
+						target:SetNWInt("O2", target:GetNWInt("O2", 100) - 15)
+					end)
+					AllTimers[timerName] = timerName
+					TraheaTimers[target:SteamID()] = timerName
+				end
+				
                 
                 if aorta then
 					print("Aorta Hitted")
@@ -955,7 +939,8 @@ local function HandleOrganDamage(target, dmginfo)
 					target:ChatPrint("Бум, вам попали в сердце, у вас сильная отдышка и очень массивная боль.")
                     target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 30)
                     target:SetNWBool("ArterialBleeding", true)
-                    local timerName = "organ_timer" .. target:SteamID()
+                    target.stamina = math.max(target.stamina - 30, 0) -- Уменьшение стамины
+					local timerName = "organ_timer" .. target:SteamID()
                     timer.Create(timerName, 0.3, 0, function()
 						if not IsValid(target) then timer.Remove(timerName); return end
                         local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Spine2"))
@@ -989,35 +974,19 @@ local function HandleOrganDamage(target, dmginfo)
 
                 if lung then
 					if not IsValid(target) then return end
-                    print("Lung Hitted")
-					target:ChatPrint("Вы чувствуете, что ваша грудная клетка переполняется кислородом, видимо у вас пневмоторакс! Вы кашляете кровью!")
-                    local timerName = "organ_timer" .. target:SteamID()
-                    timer.Create(timerName, 3, 0, function()
+					print("Lung Hitted")
+					target:ChatPrint("Вы чувствуете, что ваша грудная клетка переполняется кислородом")
+					target:SetNWInt("Pain", target:GetNWInt("Pain", 0) + 20)
+					target.stamina = math.max(target.stamina - 15, 0) -- Потеря стамины из-за недостатка кислорода
+					local timerName = "organ_timer" .. target:SteamID()
+					timer.Create(timerName, 3, 0, function()
 						if not IsValid(target) then timer.Remove(timerName); return end
-                        local handPos, handAng = target:GetBonePosition(target:LookupBone("ValveBiped.Bip01_Head1"))
-                        local bloodPos = handPos + handAng:Forward() * 50
-                        local bloodTrace = util.TraceLine({
-                            start = bloodPos,
-                            endpos = bloodPos - Vector(0, 0, 100),
-                            filter = target
-                        })
-                        if bloodTrace.Hit then
-                            if default_dblood == false then
-								if not IsValid(target) then timer.Remove(timerName); return end
-                                util.Decal(table.Random(venous_paint), bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
-                            end
-                            if default_dblood == true then
-								if not IsValid(target) then timer.Remove(timerName); return end
-                                util.Decal("Blood", bloodTrace.HitPos + bloodTrace.HitNormal, bloodTrace.HitPos - bloodTrace.HitNormal)
-                            end
-							if not IsValid(target) then timer.Remove(timerName); return end
-                            target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target:GetNWInt("O2", 100) / 5)
-                            target:SetNWInt("O2", target:GetNWInt("O2", 100) - 15)
-                        end
-                    end)
-                    AllTimers[timerName] = timerName
-                    LungTimers[target:SteamID()] = timerName
-                end
+						target:SetNWInt("O2", target:GetNWInt("O2", 100) - 15)
+						target:SetNWInt("Blood", target:GetNWInt("Blood", 5000) - target:GetNWInt("O2", 100) / 5)
+					end)
+					AllTimers[timerName] = timerName
+					LungTimers[target:SteamID()] = timerName
+				end
                 
                 if pelvis then
 					if not IsValid(target) then return end
