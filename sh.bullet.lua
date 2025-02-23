@@ -41,6 +41,58 @@ function SWEP:BulletCallbackFunc(dmgAmt, ply, tr, dmg, tracer, hard, multi, trac
     if hard then self:RicochetOrPenetrate(tr, tracerColor, bounces, bulletSpeed) end
 end
 
+-- Функция для расчета глубины проникновения
+local function GetPenetrationDepth(bulletData, tr)
+    -- Временная реализация, замените на более сложную
+    local material = tr.MatType
+    local hardness = SIB_SurfaceHardness[material] or 0.5
+    return bulletData.PenetrationPower * hardness
+end
+
+-- Функция для обработки пробития пули
+local function HandleBulletPenetration(bulletData, tr, weapon, tracerColor, bounces)
+    -- penetrationDepth - глубина на которую пуля пройдет через обьект
+    local penetrationDepth = GetPenetrationDepth(bulletData, tr)
+	-- Если пробитие невозможно, то выходим из функции
+    if penetrationDepth <= 0 then return end
+
+    local remainingVelocity = bulletData.Velocity * 0.75 -- Снижение скорости пули после пробития (потеря энергии)
+    local newDirection = bulletData.Direction
+    
+    -- Деформация пули: уменьшение пробивной способности
+    bulletData.PenetrationPower = bulletData.PenetrationPower * 0.7
+    
+    -- Учёт инерции пули после пробития
+    local exitPoint = tr.HitPos + newDirection * penetrationDepth
+    local newBullet = {
+        Position = exitPoint,
+        Direction = newDirection,
+        Velocity = remainingVelocity,
+        PenetrationPower = bulletData.PenetrationPower,
+        Damage = bulletData.Damage * 0.85 -- Немного снижаем урон
+    }
+    if SERVER and GetConVar("sib_dev_tracers"):GetBool() then
+         print("Initial Velocity: ", bulletData.Velocity)
+         print("Remaining Velocity: ", remainingVelocity)
+    end
+    weapon:FireBullets({
+        Attacker = weapon.Owner,
+        Damage = newBullet.Damage,
+        Force = weapon.Primary.Force / 5, -- Примерное значение
+        Num = 1,
+        Tracer = 1,
+        TracerName = "Tracer",
+        Dir = newBullet.Direction,
+        Spread = Vector(0,0,0),
+        Src = newBullet.Position,
+        Callback = function(ply, tr, dmgInfo)
+            -- Передаем необходимые данные для дальнейшей обработки
+            local newBounces = bounces + 1
+            ply:GetActiveWeapon():BulletCallbackFunc(newBullet.Damage, ply, tr, newBullet.Damage, false, true, false, tracerColor, newBounces, remainingVelocity)
+        end
+    })
+end
+
 function SWEP:RicochetOrPenetrate(initialTrace, tracerColor, bounces, bulletSpeed)
     if bounces >= MAX_BOUNCES then
         return
@@ -71,32 +123,25 @@ function SWEP:RicochetOrPenetrate(initialTrace, tracerColor, bounces, bulletSpee
 			else
 				SearchDist=SearchDist+5
 			end
-		if(Penetrated)then
+			if(Penetrated)then
              if CLIENT and GetConVar("sib_dev_tracers"):GetBool() then
                   debugoverlay.Line(IPos, SearchPos, 2, Color(0, 255, 0), true, 10)
                 debugoverlay.Cross(SearchPos, 2, 2, Color(255, 255, 0), true, 10)
              end
-			local DamageLoss = 0.35 + ApproachAngle / 180
-       		local NewDamage = self.Primary.Damage * (1 - DamageLoss)
-        	local NewForce = self.Primary.Force * 0.2 * (1 - bounces * 0.1)
-			self:FireBullets({
-				Attacker=self.Owner,
-				Damage=NewDamage,
-				Force=NewForce,
-				Num=1,
-				Tracer=1,
-				TracerName="Tracer",
-				Dir=AVec,
-				Spread=Vector(0,0,0),
-				Src=SearchPos+AVec,
-				Callback = function(ply, tr, dmgInfo)
-					local newBounces = bounces + 1
-					ply:GetActiveWeapon():BulletCallbackFunc(self.Primary.Damage,ply,tr,self.Primary.Damage,false,true,false,tracerColor, newBounces, bulletSpeed)
-				end
-			})
+            -- Если пробитие успешно, вызываем HandleBulletPenetration
+            local bulletData = {
+                Position = IPos,
+                Direction = AVec,
+                Velocity = bulletSpeed,
+                PenetrationPower = 100,  -- Примерное начальное значение (настроить!)
+                Damage = self.Primary.Damage
+            }
+            HandleBulletPenetration(bulletData, initialTrace, self, tracerColor, bounces)
+            return -- Важно: выходим из функции, чтобы не продолжать расчет рикошета
 		end
 	end
     else
+        -- Рикошет
         sound.Play("snd_jack_hmcd_ricochet_"..math.random(1,2)..".wav",IPos,70,math.random(90,100))
         local reflectAngle = (AVec - 2 * AVec:Dot(TNorm) * TNorm):GetNormalized()
 
@@ -272,6 +317,8 @@ if CLIENT then
         util.Decal("Impact.Flesh", pos1, pos2)
     end)
 end
+
+
 
 function SWEP:IsReloaded()
 	return timer.Exists("reload"..self:EntIndex())
